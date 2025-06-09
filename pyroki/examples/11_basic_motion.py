@@ -14,69 +14,101 @@ from viser.extras import ViserUrdf
 import pyroki_snippets as pks
 
 
-def main():
-    """Main function for basic IK."""
+class RobotMotionController:
+    """
+    Controls the motion of a robot's end-effector using Inverse Kinematics (IK).
+    """
 
-    urdf = load_robot_description("panda_description")
-    target_link_name = "panda_hand"
+    def __init__(self, urdf_path: str, target_link_name: str = "panda_hand"):
+        """
+        Initialize the robot, PyRoki, and Viser visualizer.
 
-    # Create robot.
-    robot = pk.Robot.from_urdf(urdf)
+        Args:
+            urdf_path (str): Path to the URDF description of the robot.
+            target_link_name (str): Name of the end-effector link to control.
+        """
+        self.robot = pk.Robot.from_urdf(load_robot_description(urdf_path))
+        self.target_link_name = target_link_name
 
-    # Set up visualizer.
-    server = viser.ViserServer()
-    server.scene.add_grid("/ground", width=2, height=2)
-    urdf_vis = ViserUrdf(server, urdf, root_node_name="/base")
+        # Set up visualizer.
+        self.server = viser.ViserServer()
+        self.server.scene.add_grid("/ground", width=2, height=2)
+        self.urdf_vis = ViserUrdf(self.server, load_robot_description(urdf_path), root_node_name="/base")
 
-    # Create interactive controller with initial position.
-    # ik_target = server.scene.add_transform_controls(  # Removed interactive control
-    #     "/ik_target", scale=0.2, position=(0.61, 0.0, 0.56), wxyz=(0, 0, 1, 0)
-    # )
-    timing_handle = server.gui.add_number("Elapsed (ms)", 0.001, disabled=True)
-
-    # Define circle parameters
-    center_x = 0.5
-    center_y = 0.0
-    radius = 0.1
-    fixed_z = 0.4
-    clr = (0.0, 1.0, 0.0)  # Green color for the target sphere
-
-    # Add a sphere to visualize the target position
-    target_sphere = server.scene.add_icosphere(
-        "/ik_target_sphere", radius=0.02, color=clr, position=(center_x, center_y, fixed_z)
-    )
-
-    start_time_offset = time.time() # To make the motion start from a consistent point
-
-    while True:
-        # Calculate angle based on time for circular motion
-        angle = (time.time() - start_time_offset) * 0.5 # Adjust 0.5 for speed
-
-        # Calculate target position on the circle
-        target_position_x = center_x + radius * np.cos(angle)
-        target_position_y = center_y + radius * np.sin(angle)
-        target_position_z = fixed_z
-        target_position = np.array([target_position_x, target_position_y, target_position_z])
-
-        # Solve IK.
-        start_ik_time = time.time()
-        solution = pks.solve_ik(
-            robot=robot,
-            target_link_name=target_link_name,
-            target_position=target_position,
-            target_wxyz=np.array([0, 0, 1, 0]), # Keep orientation fixed, or adjust as needed
+        self.timing_handle = self.server.gui.add_number("Elapsed (ms)", 0.001, disabled=True)
+        self.target_sphere = self.server.scene.add_icosphere(
+            "/ik_target_sphere", radius=0.02, color=(0.0, 1.0, 0.0) # Green color
         )
 
-        # Update timing handle.
+    def _solve_and_update(self, target_position: np.ndarray, target_wxyz: np.ndarray):
+        """
+        Solve IK for the given target and update the robot's visualization.
+
+        Args:
+            target_position (np.ndarray): Desired position of the end-effector.
+            target_wxyz (np.ndarray): Desired orientation (wxyz quaternion) of the end-effector.
+        """
+        start_ik_time = time.time()
+        solution = pks.solve_ik(
+            robot=self.robot,
+            target_link_name=self.target_link_name,
+            target_position=target_position,
+            target_wxyz=target_wxyz,
+        )
+
         elapsed_ik_time = time.time() - start_ik_time
-        timing_handle.value = 0.99 * timing_handle.value + 0.01 * (elapsed_ik_time * 1000)
+        self.timing_handle.value = 0.99 * self.timing_handle.value + 0.01 * (elapsed_ik_time * 1000)
 
-        # Update visualizer.
-        urdf_vis.update_cfg(solution)
-        target_sphere.position = target_position # Update the sphere's position
+        self.urdf_vis.update_cfg(solution)
+        self.target_sphere.position = target_position
 
-        # Small sleep to prevent busy-waiting and reduce CPU usage
-        time.sleep(0.01)
+    def move_circular(
+        self,
+        center_x: float,
+        center_y: float,
+        radius: float,
+        fixed_z: float,
+        speed: float = 0.5,
+        target_wxyz: np.ndarray = np.array([0, 0, 1, 0]),
+    ):
+        """
+        Make the end-effector follow a circular path.
+
+        Args:
+            center_x (float): X-coordinate of the circle's center.
+            center_y (float): Y-coordinate of the circle's center.
+            radius (float): Radius of the circular path.
+            fixed_z (float): Fixed Z-coordinate for the circular path.
+            speed (float): Speed of rotation around the circle.
+            target_wxyz (np.ndarray): Fixed orientation (wxyz quaternion) of the end-effector.
+        """
+        self.target_sphere.position = (center_x, center_y, fixed_z) # Set initial sphere position
+        start_time_offset = time.time()
+
+        while True:
+            angle = (time.time() - start_time_offset) * speed
+            target_position_x = center_x + radius * np.cos(angle)
+            target_position_y = center_y + radius * np.sin(angle)
+            target_position = np.array([target_position_x, target_position_y, fixed_z])
+
+            self._solve_and_update(target_position, target_wxyz)
+            time.sleep(0.01)
+
+    # def move_rectangular(self,):
+    #     pass
+
+def main():
+    # Main function to run the robot motion controller
+    controller = RobotMotionController(urdf_path="panda_description", target_link_name="panda_hand")
+
+    # Make the end-effector follow a circular path
+    controller.move_circular(
+        center_x=0.5,
+        center_y=0.0,
+        radius=0.1,
+        fixed_z=0.4,
+        speed=0.5,
+    )
 
 if __name__ == "__main__":
     main()
