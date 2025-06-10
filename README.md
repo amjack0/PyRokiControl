@@ -1,6 +1,6 @@
 # PyRokiControl - Basic Inverse Kinematics Example
 
-This project demonstrates basic inverse kinematics (IK) control of a robot end-effector using [PyRoki](https://github.com/roki-project/pyroki) and [Viser](https://github.com/roki-project/viser) for visualization.
+This project demonstrates basic inverse kinematics (IK) control of a robot end-effector using [PyRoki](https://pyroki-toolkit.github.io/) and Viser for visualization.
 
 ## Features
 
@@ -11,8 +11,8 @@ This project demonstrates basic inverse kinematics (IK) control of a robot end-e
 ## Requirements
 
 - Python 3.8+
-- [PyRoki](https://github.com/roki-project/pyroki)
-- [Viser](https://github.com/roki-project/viser)
+- [PyRoki](https://github.com/chungmin99/pyroki)
+- Viser
 - NumPy
 
 Install dependencies with:
