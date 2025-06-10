@@ -94,13 +94,55 @@ class RobotMotionController:
             self._solve_and_update(target_position, target_wxyz)
             time.sleep(0.01)
 
-    # def move_rectangular(self,):
-    #     pass
+    def move_linear(
+        self,
+        start_position: np.ndarray,
+        end_position: np.ndarray,
+        duration: float = 5.0, # Duration in seconds for one full traverse
+        target_wxyz: np.ndarray = np.array([0, 0, 1, 0]),
+    ):
+        """
+        Makes the end-effector follow a linear path between two points,
+        repeating the motion back and forth.
+
+        Args:
+            start_position (np.ndarray): The starting position of the end-effector (x, y, z).
+            end_position (np.ndarray): The ending position of the end-effector (x, y, z).
+            duration (float): The time in seconds for a one-way traverse from start to end.
+            target_wxyz (np.ndarray): The fixed orientation (wxyz quaternion) of the end-effector.
+        """
+        start_position = np.array(start_position)
+        end_position = np.array(end_position)
+        
+        # Set initial sphere position
+        self.target_sphere.position = start_position 
+
+        start_time_offset = time.time()
+
+        while True:
+            elapsed_time = time.time() - start_time_offset
+            
+            # Normalize time to a 0-1 range, then extend to a 0-2 range for back-and-forth motion
+            normalized_time = (elapsed_time % (2 * duration)) / (2 * duration)
+
+            if normalized_time <= 0.5:
+                # Moving from start_position to end_position (0 to 0.5 in normalized_time)
+                # progress will go from 0 to 1
+                progress = normalized_time * 2
+                target_position = start_position + progress * (end_position - start_position)
+            else:
+                # Moving from end_position back to start_position (0.5 to 1.0 in normalized_time)
+                # progress will go from 1 to 0
+                progress = (1.0 - normalized_time) * 2
+                target_position = start_position + progress * (end_position - start_position)
+
+            self._solve_and_update(target_position, target_wxyz)
+            time.sleep(0.01)
 
 def main():
     # Main function to run the robot motion controller
     controller = RobotMotionController(urdf_path="panda_description", target_link_name="panda_hand")
-
+    """
     # Make the end-effector follow a circular path
     controller.move_circular(
         center_x=0.5,
@@ -109,6 +151,14 @@ def main():
         fixed_z=0.4,
         speed=0.5,
     )
+    """
+    # Make the end-effector follow a linear path
+    controller.move_linear(
+        start_position=np.array([0.6, 0.1, 0.5]),
+        end_position=np.array([0.6, -0.1, 0.5]),
+        duration=3.0, # 3 seconds to go from start to end
+    )
+
 
 if __name__ == "__main__":
     main()
