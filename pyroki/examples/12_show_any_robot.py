@@ -4,6 +4,7 @@ import viser
 from viser.extras import ViserUrdf
 from robot_descriptions.loaders.yourdfpy import load_robot_description
 import numpy as np
+import time
 
 # Minimal PyRoki + Viser example. 
 
@@ -26,29 +27,22 @@ ROBOT_DESCRIPTIONS = [
 
 
 def main():
-    failed_robots = []
+    robot_name = "a1_description"
     try:
-        for robot_name in ROBOT_DESCRIPTIONS:
-            print(f"\n[show_any_robot] Loading and visualizing: {robot_name}")
-            try:
-                urdf = load_robot_description(robot_name)
-                robot = pk.Robot.from_urdf(urdf)
-            except Exception as e:
-                print(f"Failed to load {robot_name}: {e}")
-                failed_robots.append(robot_name)
-                continue
+        urdf = load_robot_description(robot_name)
+        robot = pk.Robot.from_urdf(urdf)
+    except Exception as e:
+        print(f"Failed to load {robot_name}: {e}")
 
-            server = viser.ViserServer()
-            urdf_vis = ViserUrdf(server, urdf, root_node_name="/base")
-            server.scene.add_grid("/ground", width=2, height=2)
+    server = viser.ViserServer()
+    urdf_vis = ViserUrdf(server, urdf, root_node_name="/base")
+    server.scene.add_grid("/ground", width=2, height=2)
 
-            # Visualize the default configuration
-            urdf_vis.update_cfg(np.zeros(len(robot.joints.names)))
-
-            input("[show_any_robot] Press Enter to continue to the next robot...")
-            server.stop()
-    finally:
-        print(f"\n[show_any_robot] List of Failed Descriptions: {failed_robots}") 
+    # Visualize the default configuration
+    urdf_vis.update_cfg(np.zeros(len(robot.joints.names)))
+    # Keep the server running
+    while True:
+        time.sleep(1)
 
 if __name__ == "__main__":
     main()
