@@ -10,7 +10,8 @@ from robot_descriptions.loaders.yourdfpy import load_robot_description
 import numpy as np
 import time
 import tyro
-from typing import Literal
+from typing import Literal, Optional
+import yourdfpy
 
 # Basic Motion planning for legged robots
 
@@ -46,21 +47,33 @@ def create_robot_control_sliders(
 
 
 def main(
-    robot_type: Literal[
+    robot_type: Optional[Literal[
         "panda_description", "ur10_description", "cassie_description", "allegro_hand_description", 
         "barrett_hand_description", "robotiq_2f85_description", "atlas_drc_description",
-        "g1_description", "h1_description", "anymal_c_description", "go2_description", "anymal_d_description"] 
+        "g1_description", "h1_description", "anymal_c_description", "go2_description", "anymal_d_description"]]
         = "panda_description",
+    urdf_path: Optional[str] = None, # Added urdf_path as an optional input
 ) -> None:
     # Start viser server.
     server = viser.ViserServer()
 
-    # This takes either a yourdfpy.URDF object or a path to a .urdf file.
-    viser_urdf = ViserUrdf(
-        server,
-        urdf_or_path=load_robot_description(robot_type),
-    )
+    urdf_path = r"D:\Python_projects\PyRokiControl\custom_urdf\02_custom_quadruped.urdf" # TODO: as a parameter
 
+    # Load URDF based on input
+    if urdf_path:
+        # Load the URDF file using yourdfpy.URDF.load() first
+        try:
+            urdf_model = yourdfpy.URDF.load(urdf_path)
+            viser_urdf = ViserUrdf(server, urdf_or_path=urdf_model)
+        except Exception as e:
+            print(f"[custom_urdf_ik] Error loading custom URDF from '{urdf_path}': {e}")
+            return
+    elif robot_type:
+        # Otherwise use available robot_type
+        viser_urdf = ViserUrdf(server, urdf_or_path=load_robot_description(robot_type))
+    else:
+        raise ValueError("[custom_urdf_ik] Either 'robot_type' or 'urdf_path' must be provided.")
+    
     # Create sliders in GUI that help us move the robot joints.
     with server.gui.add_folder("Joint position control"):
         (slider_handles, initial_config) = create_robot_control_sliders(server, viser_urdf)
