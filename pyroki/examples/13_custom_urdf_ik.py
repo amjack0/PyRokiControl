@@ -78,7 +78,11 @@ def main(
         # Load the URDF file using yourdfpy.URDF.load() first
         try:
             urdf_model = yourdfpy.URDF.load(urdf_path)
-            viser_urdf = ViserUrdf(server, urdf_or_path=urdf_model, root_node_name="/base") # TODO: "/base" as parameter
+            viser_urdf = ViserUrdf(server, urdf_or_path=urdf_model, root_node_name=f"/{urdf_model.base_link}")
+            print(f"[custom_urdf_ik] URDF base_link A'{urdf_model.base_link}'")
+            all_links = list(urdf_model.link_map.keys())
+            target_link_name = all_links[-1]
+            print(f"[custom_urdf_ik] last link in the URDF A: {target_link_name}")
             # Create robot.
             robot = pk.Robot.from_urdf(urdf_model)
         except Exception as e:
@@ -87,13 +91,17 @@ def main(
     elif robot_type:
         # Otherwise use available robot_type
         urdf = load_robot_description(robot_type)
-        viser_urdf = ViserUrdf(server, urdf_or_path=urdf, root_node_name="/base") # TODO: "/base" as parameter
+        print(f"[custom_urdf_ik] URDF base_link B'{urdf.base_link}'")
+        viser_urdf = ViserUrdf(server, urdf_or_path=urdf, root_node_name=f"/{urdf.base_link}")
+        all_links = list(urdf.link_map.keys())
+        target_link_name = all_links[-1]
+        print(f"[custom_urdf_ik] last link in the URDF B: {target_link_name}")
         # Create robot.
         robot = pk.Robot.from_urdf(urdf)
     else:
         raise ValueError("[custom_urdf_ik] Either 'robot_type' or 'urdf_path' must be provided.")
 
-    target_link_name = "panda_hand" # TODO: make this a parameter
+    # target_link_name = "panda_hand" # TODO: make this a parameter by user.
     # Create interactive controller with initial position.
     ik_target = server.scene.add_transform_controls(
         "/ik_target", scale=0.2, position=(0.61, 0.0, 0.56), wxyz=(0, 0, 1, 0)) # TODO: position=(0.61, 0.0, 0.56) as parameter
@@ -101,6 +109,8 @@ def main(
     # Create sliders in GUI that help us move the robot joints.
     with server.gui.add_folder("Joint position control"):
         (slider_handles, initial_config) = create_robot_control_sliders(server, viser_urdf)
+    
+    print(f"[custom_urdf_ik] Initial configuration: {initial_config}")
 
     # Set initial robot configuration.
     viser_urdf.update_cfg(np.array(initial_config))
