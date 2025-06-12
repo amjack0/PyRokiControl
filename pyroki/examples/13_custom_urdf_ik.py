@@ -3,6 +3,16 @@ Minimal PyRoki + Viser + Custom URDF
 - https://github.com/nerfstudio-project/viser/blob/main/examples/09_urdf_visualizer.py
 
 """
+# TODO: doing IK -- demonstrating how users can actually use custom robot models with PyRoki.
+"""
+Capsule shape is not a standard primitive geometry type directly supported by URDF. 
+URDF primarily supports:
+    <box>
+    <cylinder>
+    <sphere>
+    <mesh> (for loading external 3D model files like .stl, .dae, .obj)
+"""
+
 import pyroki as pk
 import viser
 from viser.extras import ViserUrdf
@@ -12,6 +22,8 @@ import time
 import tyro
 from typing import Literal, Optional
 import yourdfpy
+import sys
+import signal
 
 # Basic Motion planning for legged robots
 
@@ -28,6 +40,8 @@ def create_robot_control_sliders(
     ) in viser_urdf.get_actuated_joint_limits().items():
         lower = lower if lower is not None else -np.pi
         upper = upper if upper is not None else np.pi
+        if lower == -np.pi and upper == np.pi:
+            print(f"[custom_urdf_ik] Warning: Joint '{joint_name}' has no specified limits. Defaulting to [-pi, pi].")
         initial_pos = 0.0 if lower < 0 and upper > 0 else (lower + upper) / 2.0
         slider = server.gui.add_slider(
             label=joint_name,
@@ -56,8 +70,7 @@ def main(
 ) -> None:
     # Start viser server.
     server = viser.ViserServer()
-
-    urdf_path = r"D:\Python_projects\PyRokiControl\custom_urdf\02_custom_quadruped.urdf" # TODO: as a parameter
+    # urdf_path = r"D:\Python_projects\PyRokiControl\custom_urdf\02_custom_quadruped.urdf"
 
     # Load URDF based on input
     if urdf_path:
@@ -92,7 +105,13 @@ def main(
         for s, init_q in zip(slider_handles, initial_config):
             s.value = init_q
 
-    # Sleep forever.
+    # Handle Ctrl+C gracefully
+    def signal_handler(sig, frame):
+        print("[custom_urdf_ik] Shutting down Viser server...")
+        server.stop()
+        sys.exit(0)
+    signal.signal(signal.SIGINT, signal_handler)
+
     while True:
         time.sleep(10.0)
 
