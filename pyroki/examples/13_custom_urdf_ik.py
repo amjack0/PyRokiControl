@@ -14,6 +14,7 @@ URDF primarily supports:
 """
 
 import pyroki as pk
+import pyroki_snippets as pks
 import viser
 from viser.extras import ViserUrdf
 from robot_descriptions.loaders.yourdfpy import load_robot_description
@@ -77,15 +78,25 @@ def main(
         # Load the URDF file using yourdfpy.URDF.load() first
         try:
             urdf_model = yourdfpy.URDF.load(urdf_path)
-            viser_urdf = ViserUrdf(server, urdf_or_path=urdf_model)
+            viser_urdf = ViserUrdf(server, urdf_or_path=urdf_model, root_node_name="/base") # TODO: "/base" as parameter
+            # Create robot.
+            robot = pk.Robot.from_urdf(urdf_model)
         except Exception as e:
             print(f"[custom_urdf_ik] Error loading custom URDF from '{urdf_path}': {e}")
             return
     elif robot_type:
         # Otherwise use available robot_type
-        viser_urdf = ViserUrdf(server, urdf_or_path=load_robot_description(robot_type))
+        urdf = load_robot_description(robot_type)
+        viser_urdf = ViserUrdf(server, urdf_or_path=urdf, root_node_name="/base") # TODO: "/base" as parameter
+        # Create robot.
+        robot = pk.Robot.from_urdf(urdf)
     else:
         raise ValueError("[custom_urdf_ik] Either 'robot_type' or 'urdf_path' must be provided.")
+
+    target_link_name = "panda_hand" # TODO: make this a parameter
+    # Create interactive controller with initial position.
+    ik_target = server.scene.add_transform_controls(
+        "/ik_target", scale=0.2, position=(0.61, 0.0, 0.56), wxyz=(0, 0, 1, 0)) # TODO: position=(0.61, 0.0, 0.56) as parameter
     
     # Create sliders in GUI that help us move the robot joints.
     with server.gui.add_folder("Joint position control"):
@@ -113,7 +124,21 @@ def main(
     signal.signal(signal.SIGINT, signal_handler)
 
     while True:
-        time.sleep(10.0)
+        # Solve IK
+        try:
+            ik_solution = pks.solve_ik(
+                robot=robot,
+                target_link_name=target_link_name,
+                target_position=np.array(ik_target.position),
+                target_wxyz=np.array(ik_target.wxyz),
+            )
+            if ik_solution is not None:
+                # Update sliders with the IK solution.
+                for slider, value in zip(slider_handles, ik_solution):
+                    slider.value = value
+        except Exception as e:
+            print(f"[custom_urdf_ik] Error solving IK: {e}")
+        # time.sleep(0.01)
 
 
 if __name__ == "__main__":
