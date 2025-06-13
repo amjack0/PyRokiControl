@@ -26,7 +26,8 @@ import yourdfpy
 import sys
 import signal
 
-# Basic Motion planning for legged robots
+# This script is for single target IK (solve_ik), but can be extended to multiple targets (solve_ik_with_multiple_targets). 
+# This script works well with custom URDF serial-chain robots including Panda, iiwa7_description, and fanuc_m710ic_description.
 
 def create_robot_control_sliders(
     server: viser.ViserServer, viser_urdf: ViserUrdf
@@ -65,6 +66,7 @@ def main(
     robot_type: Optional[Literal[
         "panda_description", "ur10_description", "cassie_description", "allegro_hand_description", 
         "barrett_hand_description", "robotiq_2f85_description", "atlas_drc_description",
+        "iiwa7_description", "iiwa14_description", "fanuc_m710ic_description",
         "g1_description", "h1_description", "anymal_c_description", "go2_description", "anymal_d_description"]]
         = "panda_description",
     urdf_path: Optional[str] = None, # Added urdf_path as an optional input
@@ -92,7 +94,7 @@ def main(
         # Otherwise use available robot_type
         urdf = load_robot_description(robot_type)
         print(f"[custom_urdf_ik] URDF base_link B'{urdf.base_link}'")
-        viser_urdf = ViserUrdf(server, urdf_or_path=urdf, root_node_name=f"/{urdf.base_link}")
+        viser_urdf = ViserUrdf(server, urdf_or_path=urdf, root_node_name=f"/{urdf.base_link}") # "/base_link"
         all_links = list(urdf.link_map.keys())
         target_link_name = all_links[-1]
         print(f"[custom_urdf_ik] last link in the URDF B: {target_link_name}")
@@ -102,9 +104,12 @@ def main(
         raise ValueError("[custom_urdf_ik] Either 'robot_type' or 'urdf_path' must be provided.")
 
     # target_link_name = "panda_hand" # TODO: make this a parameter by user.
+    bounds = viser_urdf._urdf.scene.bounds
+    center = (bounds[0] + bounds[1]) / 2
+    pos = center + np.array([0, 0, 0.2])  # 20cm above center
     # Create interactive controller with initial position.
     ik_target = server.scene.add_transform_controls(
-        "/ik_target", scale=0.2, position=(0.61, 0.0, 0.56), wxyz=(0, 0, 1, 0)) # TODO: position=(0.61, 0.0, 0.56) as parameter
+        "/ik_target", scale=0.2, position=pos, wxyz=(0, 0, 1, 0)) # TODO: position and wxyz as parameter
     
     # Create sliders in GUI that help us move the robot joints.
     with server.gui.add_folder("Joint position control"):
