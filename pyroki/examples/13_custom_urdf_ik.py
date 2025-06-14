@@ -66,42 +66,40 @@ def main(
     robot_type: Optional[Literal[
         "panda_description", "ur10_description", "cassie_description", "allegro_hand_description", 
         "barrett_hand_description", "robotiq_2f85_description", "atlas_drc_description",
-        "iiwa7_description", "iiwa14_description", "fanuc_m710ic_description",
+        "iiwa7_description", "iiwa14_description", "fanuc_m710ic_description", 'ur3_description', 'ur5_description',
         "g1_description", "h1_description", "anymal_c_description", "go2_description", "anymal_d_description"]]
         = "panda_description",
     urdf_path: Optional[str] = None, # Added urdf_path as an optional input
 ) -> None:
     # Start viser server.
     server = viser.ViserServer()
-    # urdf_path = r"D:\Python_projects\PyRokiControl\custom_urdf\02_custom_quadruped.urdf"
 
-    # Load URDF based on input
-    if urdf_path:
-        # Load the URDF file using yourdfpy.URDF.load() first
-        try:
+    # Load URDF
+    urdf_model = None
+    base_link_name = None
+    target_link_name = None
+    try:
+        if urdf_path: # Load URDF from file path.
             urdf_model = yourdfpy.URDF.load(urdf_path)
-            viser_urdf = ViserUrdf(server, urdf_or_path=urdf_model, root_node_name=f"/{urdf_model.base_link}")
-            print(f"[custom_urdf_ik] URDF base_link A'{urdf_model.base_link}'")
-            all_links = list(urdf_model.link_map.keys())
-            target_link_name = all_links[-1]
-            print(f"[custom_urdf_ik] last link in the URDF A: {target_link_name}")
-            # Create robot.
-            robot = pk.Robot.from_urdf(urdf_model)
-        except Exception as e:
-            print(f"[custom_urdf_ik] Error loading custom URDF from '{urdf_path}': {e}")
-            return
-    elif robot_type:
-        # Otherwise use available robot_type
-        urdf = load_robot_description(robot_type)
-        print(f"[custom_urdf_ik] URDF base_link B'{urdf.base_link}'")
-        viser_urdf = ViserUrdf(server, urdf_or_path=urdf, root_node_name=f"/{urdf.base_link}") # "/base_link"
-        all_links = list(urdf.link_map.keys())
+        elif robot_type: # Load built-in robot description.
+            urdf_model = load_robot_description(robot_type)
+        else:
+            raise ValueError("[custom_urdf_ik] Either 'robot_type' or 'urdf_path' must be provided.")
+        # Filter out 'world' and 'base' links.
+        all_links = [l for l in urdf_model.link_map.keys() if l not in ("world", "base")]
+        if not all_links:
+            raise RuntimeError("[custom_urdf_ik] No valid links found in URDF.")
+
+        base_link_name = all_links[0]
         target_link_name = all_links[-1]
-        print(f"[custom_urdf_ik] last link in the URDF B: {target_link_name}")
-        # Create robot.
-        robot = pk.Robot.from_urdf(urdf)
-    else:
-        raise ValueError("[custom_urdf_ik] Either 'robot_type' or 'urdf_path' must be provided.")
+        viser_urdf = ViserUrdf(server, urdf_or_path=urdf_model, root_node_name=f"/{base_link_name}")
+        print(f"[custom_urdf_ik] URDF base_link: '{base_link_name}'")
+        print(f"[custom_urdf_ik] URDF last_link: '{target_link_name}'")
+        print(f"[custom_urdf_ik] URDF all_links: {all_links}")
+        robot = pk.Robot.from_urdf(urdf_model)
+    except Exception as e:
+        print(f"[custom_urdf_ik] Error loading URDF: {e}")
+        return
 
     # target_link_name = "panda_hand" # TODO: make this a parameter by user.
     bounds = viser_urdf._urdf.scene.bounds
