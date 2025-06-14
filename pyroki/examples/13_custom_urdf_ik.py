@@ -1,4 +1,14 @@
-"""
+r"""
+Usage:
+    python 13_custom_urdf_ik.py [--robot-type <robot_type>] [--urdf-path <path_to_custom_urdf>] [--target-link-name <link_name>]
+
+Examples:
+    python .\13_custom_urdf_ik.py
+    python .\13_custom_urdf_ik.py --robot-type ur10_description
+    spython .\13_custom_urdf_ik.py --urdf-path D:\Python_projects\PyRokiControl\custom_urdf\01_custom_arm.urdf
+    python .\13_custom_urdf_ik.py --urdf-path D:\Python_projects\PyRokiControl\custom_urdf\01_custom_arm.urdf --target-link-name end_effector_tool
+    
+
 Minimal PyRoki + Viser + Custom URDF
 This script demonstrates how to control a custom robot using inverse kinematics (IK)
 Capsule shape is not a standard primitive geometry type directly supported by URDF. 
@@ -6,7 +16,6 @@ URDF primarily supports:
     <box>
     <cylinder>
     <sphere>
-    <mesh> (for loading external 3D model files like .stl, .dae, .obj)
 """
 
 import pyroki as pk
