@@ -41,6 +41,7 @@ class UrdfIK:
         server: viser.ViserServer,
         robot_type: Optional[SUPPORTED_ROBOT_TYPES],
         urdf_path: Optional[str] = None,
+        target_link_name: Optional[str] = None,
     ) -> None:
         """
         Initializes the URDF IK application.
@@ -48,6 +49,7 @@ class UrdfIK:
         self.server = server
         self.robot_type = robot_type
         self.urdf_path = urdf_path
+        self.user_target_link_name = target_link_name
 
         # Initialize instance attributes
         self.robot: pk.Robot
@@ -81,10 +83,17 @@ class UrdfIK:
                 raise RuntimeError("[custom_urdf_ik] No valid links found in URDF.")
 
             base_link_name = all_links[0]
-            self.target_link_name = all_links[-1]
+            # Use provided target_link_name else default to last link
+            if self.user_target_link_name in all_links:
+                self.target_link_name = self.user_target_link_name
+            elif self.user_target_link_name is not None:
+                raise ValueError(f"[custom_urdf_ik] Provided target_link_name '{self.user_target_link_name}' not found in URDF.")
+            else:
+                self.target_link_name = all_links[-1]
+
             self.viser_urdf = ViserUrdf(self.server, urdf_or_path=urdf_model, root_node_name=f"/{base_link_name}")
-            print(f"[custom_urdf_ik] URDF base_link: '{base_link_name}' | last_link: '{self.target_link_name}'")
-            print(f"[custom_urdf_ik] URDF all_links: {all_links}")
+            print(f"[custom_urdf_ik] [base_link, target_link]: ['{base_link_name}', '{self.target_link_name}']")
+            print(f"[custom_urdf_ik] [all_links]: {all_links}")
             self.robot = pk.Robot.from_urdf(urdf_model)
         except Exception as e:
             print(f"[custom_urdf_ik] Error loading URDF: {e}")
@@ -172,12 +181,13 @@ class UrdfIK:
 def main(
     robot_type: Optional[SUPPORTED_ROBOT_TYPES] = "panda_description",
     urdf_path: Optional[str] = None,
+    target_link_name: Optional[str] = None,
 ) -> None:
     """
     Main function to initialize and run the UrdfIK.
     """
     server = viser.ViserServer()
-    app = UrdfIK(server, robot_type, urdf_path)
+    app = UrdfIK(server, robot_type, urdf_path, target_link_name)
     app.run()
 
 if __name__ == "__main__":
