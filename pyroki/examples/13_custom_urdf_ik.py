@@ -30,6 +30,8 @@ from typing import Literal, Optional, List, Tuple
 import yourdfpy
 import sys
 import signal
+import jaxlie
+import jax.numpy as jnp
 
 # Define supported robot types
 SUPPORTED_ROBOT_TYPES = Literal[
@@ -107,19 +109,20 @@ class UrdfIK:
         except Exception as e:
             print(f"[custom_urdf_ik] Error loading URDF: {e}")
             sys.exit(1) # Exit if robot model cannot be loaded
-
-        bounds = self.viser_urdf._urdf.scene.bounds
-        center = (bounds[0] + bounds[1]) / 2
-        pos = center + np.array([0, 0, 0.2])  # 20cm above center
-
-        self.ik_target = self.server.scene.add_transform_controls(
-            "/ik_target", scale=0.2, position=pos, wxyz=(0, 0, 1, 0)
-        )
-
+        
         with self.server.gui.add_folder("Joint position control"):
             self.slider_handles, self.initial_config = self._create_robot_control_sliders()
 
-        print(f"[custom_urdf_ik] Initial configuration: {self.initial_config}")
+        # Calculate initial position using forward kinematics
+        target_link_idx = self.robot.links.names.index(self.target_link_name)
+        # Perform forward kinematics with the initial configuration and extract position of the target link
+        T_root_link_target = jaxlie.SE3(self.robot.forward_kinematics(cfg=jnp.array(self.initial_config)))
+        initial_target_position = T_root_link_target.translation()[target_link_idx]
+        pos = np.array(initial_target_position)
+        # print(f"[custom_urdf_ik] Initial target position(FK): {pos}")
+
+        self.ik_target = self.server.scene.add_transform_controls("/ik_target", scale=0.2, position=pos, wxyz=(0,  0, 1, 0))
+        # print(f"[custom_urdf_ik] Initial configuration: {self.initial_config}")
         self.viser_urdf.update_cfg(np.array(self.initial_config))
         self.server.scene.add_grid("/grid", width=2, height=2, position=(0.0, 0.0, self.viser_urdf._urdf.scene.bounds[0, 2],))
         reset_button = self.server.gui.add_button("Reset")
