@@ -1,28 +1,3 @@
-r"""
-Usage:
-    python 13_custom_urdf_ik.py [--robot-type <robot_type>] [--urdf-path <path_to_custom_urdf>] [--target-link-name <link_name>]
-
-Examples:
-    python .\13_custom_urdf_ik.py
-    python .\13_custom_urdf_ik.py --robot-type ur10_description
-    spython .\13_custom_urdf_ik.py --urdf-path D:\Python_projects\PyRokiControl\custom_urdf\01_custom_arm.urdf
-    python .\13_custom_urdf_ik.py --urdf-path D:\Python_projects\PyRokiControl\custom_urdf\01_custom_arm.urdf --target-link-name end_effector_tool
-    
-
-Minimal PyRoki + Viser + Custom URDF
-This script demonstrates how to control a custom robot using inverse kinematics (IK)
-Capsule shape is not a standard primitive geometry type directly supported by URDF. 
-URDF primarily supports:
-    <box>
-    <cylinder>
-    <sphere>
-If the URDF is contains mesh, dae or stl files, the path should be specified. Continous joint is not supported yet.
-<mesh filename="package://your_robot_package_name/visual/base_link.dae"/>
-Something like should work: <mesh filename="package://kuka_kr3_support/meshes/kr3r540/visual/base_link.stl"/>
-Somethibg like does not work: <mesh filename="package://visual/base_link.dae"/> as yourdfpy interprets "visual" as the package name.
-more urdf examples at: https://github.com/Daniella1/urdf_files_dataset/tree/main/urdf_files/ros-industrial/xacro_generated
-"""
-
 import pyroki as pk
 import pyroki_snippets as pks
 import viser
