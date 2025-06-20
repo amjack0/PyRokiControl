@@ -16,6 +16,11 @@ URDF primarily supports:
     <box>
     <cylinder>
     <sphere>
+If the URDF is contains mesh, dae or stl files, the path should be specified. Continous joint is not supported yet.
+<mesh filename="package://your_robot_package_name/visual/base_link.dae"/>
+Something like should work: <mesh filename="package://kuka_kr3_support/meshes/kr3r540/visual/base_link.stl"/>
+Somethibg like does not work: <mesh filename="package://visual/base_link.dae"/> as yourdfpy interprets "visual" as the package name.
+more urdf examples at: https://github.com/Daniella1/urdf_files_dataset/tree/main/urdf_files/ros-industrial/xacro_generated
 """
 
 import pyroki as pk
@@ -124,7 +129,12 @@ class UrdfIK:
         self.ik_target = self.server.scene.add_transform_controls("/ik_target", scale=0.2, position=pos, wxyz=(0,  0, 1, 0))
         # print(f"[custom_urdf_ik] Initial configuration: {self.initial_config}")
         self.viser_urdf.update_cfg(np.array(self.initial_config))
-        self.server.scene.add_grid("/grid", width=2, height=2, position=(0.0, 0.0, self.viser_urdf._urdf.scene.bounds[0, 2],))
+        grid_z_position = 0.0
+        if self.viser_urdf._urdf.scene.bounds is not None:
+            # If bounds are available, set grid at the bottom of the robot's bounding box, else default to 0.0
+            grid_z_position = self.viser_urdf._urdf.scene.bounds[0, 2]
+        print(f"[custom_urdf_viz] [Warning]: Grid Z position set to: {grid_z_position}")
+        self.server.scene.add_grid("/grid", width=2, height=2, position=(0.0, 0.0, grid_z_position))
         reset_button = self.server.gui.add_button("Reset")
 
         @reset_button.on_click
