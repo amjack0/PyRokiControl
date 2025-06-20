@@ -85,31 +85,8 @@ class UrdfIK:
         Handles the initial setup of the robot model, visualizer,
         IK target, and GUI sliders.
         """
-        urdf_model = None
         try:
-            if self.urdf_path:  # Load URDF from file path.
-                urdf_model = yourdfpy.URDF.load(self.urdf_path)
-            elif self.robot_type:  # Load built-in robot description.
-                urdf_model = load_robot_description(self.robot_type)
-            else:
-                raise ValueError("[custom_urdf_ik] Either 'robot_type' or 'urdf_path' must be provided.")
-            # ignore the world and base, and read only the physical links
-            all_links = [l for l in urdf_model.link_map.keys() if l not in ("world", "base")]
-            if not all_links:
-                raise RuntimeError("[custom_urdf_ik] No valid links found in URDF.")
-
-            base_link_name = all_links[0]
-            # Use provided target_link_name else default to last link
-            if self.user_target_link_name in all_links:
-                self.target_link_name = self.user_target_link_name
-            elif self.user_target_link_name is not None:
-                raise ValueError(f"[custom_urdf_ik] Provided target_link_name '{self.user_target_link_name}' not found in URDF.")
-            else:
-                self.target_link_name = all_links[-1]
-
-            self.viser_urdf = ViserUrdf(self.server, urdf_or_path=urdf_model, root_node_name=f"/{base_link_name}")
-            print(f"[custom_urdf_ik] [base_link, target_link]: ['{base_link_name}', '{self.target_link_name}']")
-            print(f"[custom_urdf_ik] [all_links]: {all_links}")
+            urdf_model = self._load_robot_model()
             self.robot = pk.Robot.from_urdf(urdf_model)
         except Exception as e:
             print(f"[custom_urdf_ik] Error loading URDF: {e}")
@@ -118,29 +95,67 @@ class UrdfIK:
         with self.server.gui.add_folder("Joint position control"):
             self.slider_handles, self.initial_config = self._create_robot_control_sliders()
 
-        # Calculate initial position using forward kinematics
-        target_link_idx = self.robot.links.names.index(self.target_link_name)
-        # Perform forward kinematics with the initial configuration and extract position of the target link
-        T_root_link_target = jaxlie.SE3(self.robot.forward_kinematics(cfg=jnp.array(self.initial_config)))
-        initial_target_position = T_root_link_target.translation()[target_link_idx]
-        pos = np.array(initial_target_position)
-        # print(f"[custom_urdf_ik] Initial target position(FK): {pos}")
-
-        self.ik_target = self.server.scene.add_transform_controls("/ik_target", scale=0.2, position=pos, wxyz=(0,  0, 1, 0))
-        # print(f"[custom_urdf_ik] Initial configuration: {self.initial_config}")
+        # get initial position
+        initial_target_position = self._calculate_initial_target_position()
+        self.ik_target = self.server.scene.add_transform_controls("/ik_target", scale=0.2, position=initial_target_position, wxyz=(0,  0, 1, 0))
         self.viser_urdf.update_cfg(np.array(self.initial_config))
-        grid_z_position = 0.0
-        if self.viser_urdf._urdf.scene.bounds is not None:
-            # If bounds are available, set grid at the bottom of the robot's bounding box, else default to 0.0
-            grid_z_position = self.viser_urdf._urdf.scene.bounds[0, 2]
-        print(f"[custom_urdf_viz] [Warning]: Grid Z position set to: {grid_z_position}")
-        self.server.scene.add_grid("/grid", width=2, height=2, position=(0.0, 0.0, grid_z_position))
+        self._setup_grid()
         reset_button = self.server.gui.add_button("Reset")
 
         @reset_button.on_click
         def _(_):
             for s, init_q in zip(self.slider_handles, self.initial_config):
                 s.value = init_q
+    
+    def _setup_grid(self) -> None:
+        """
+        Sets up the grid in the Viser server, positioning it at the bottom
+        of the robot's bounding box if available, otherwise at z=0.0.
+        """
+        grid_z_position = 0.0
+        if self.viser_urdf._urdf.scene.bounds is not None:
+            grid_z_position = self.viser_urdf._urdf.scene.bounds[0, 2]
+        print(f"[custom_urdf_viz] [Warning]: Grid Z position set to: {grid_z_position}")
+        self.server.scene.add_grid("/grid", width=2, height=2, position=(0.0, 0.0, grid_z_position))
+
+    def _calculate_initial_target_position(self) -> np.ndarray:
+        """Calculates the initial position of the target link using forward kinematics."""
+        target_link_idx = self.robot.links.names.index(self.target_link_name)
+        T_root_link_target = jaxlie.SE3(self.robot.forward_kinematics(cfg=jnp.array(self.initial_config)))
+        initial_target_position = T_root_link_target.translation()[target_link_idx]
+        # print(f"[custom_urdf_ik] Initial target position(FK): {initial_target_position}")
+        return np.array(initial_target_position)
+
+    def _load_robot_model(self) -> yourdfpy.URDF:
+        """
+        Loads the URDF model from a file path or a built-in robot description.
+        Raises an error if the model cannot be loaded or if no valid links are found.
+        """
+        urdf_model = None
+        if self.urdf_path:
+            urdf_model = yourdfpy.URDF.load(self.urdf_path)
+        elif self.robot_type:
+            urdf_model = load_robot_description(self.robot_type)
+        else:
+            raise ValueError("[custom_urdf_ik] Either 'robot_type' or 'urdf_path' must be provided.")
+
+        all_links = [l for l in urdf_model.link_map.keys() if l not in ("world", "base")]
+        if not all_links:
+            raise RuntimeError("[custom_urdf_ik] No valid links found in URDF.")
+
+        base_link_name = all_links[0]
+        if self.user_target_link_name in all_links:
+            self.target_link_name = self.user_target_link_name
+        elif self.user_target_link_name is not None:
+            raise ValueError(f"[custom_urdf_ik] Provided target_link_name '{self.user_target_link_name}' not found in URDF.")
+        else:
+            self.target_link_name = all_links[-1]
+
+        self.viser_urdf = ViserUrdf(self.server, urdf_or_path=urdf_model, root_node_name=f"/{base_link_name}")
+        print(f"[custom_urdf_ik] [base_link, target_link]: ['{base_link_name}', '{self.target_link_name}']")
+        print(f"[custom_urdf_ik] [all_links]: {all_links}")
+        return urdf_model
+
 
     def _create_robot_control_sliders(
         self,
