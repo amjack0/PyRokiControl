@@ -4,9 +4,10 @@ This project demonstrates basic inverse kinematics (IK) control of a robot end-e
 
 ## Features
 
-- Visualizes a robot arm using a URDF description.
+- Visualizes custom URDF files or use built-in robot descriptions.
+- Inverse Kinematics (IK) to control the robot's end-effector.
 - Moves the end-effector along circular or linear paths using IK.
-- Real-time visualization and timing feedback.
+- Interactive 3D visualization of the robot using Viser.
 
 ## Requirements
 
@@ -31,6 +32,11 @@ python pyroki/examples/11_basic_motion.py
 ```
 
 By default, the script moves the end-effector along a linear path. To use a circular path, uncomment the relevant section in `main()`.
+
+```
+For custom URDF and IK:
+python 13_custom_urdf_ik.py [--robot-type <robot_type>] [--urdf-path <path_to_custom_urdf>] [--target-link-name <link_name>]
+```
 
 ## File Structure
 
