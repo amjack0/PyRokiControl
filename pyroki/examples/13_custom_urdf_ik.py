@@ -51,6 +51,10 @@ class UrdfIK:
         self.ik_target: viser.TransformControlsHandle
         self.ik_mode_checkbox: viser.GuiInputHandle[bool]
 
+        self._last_joint_positions = None
+        self._last_time = None
+        self._last_joint_velocities = None
+
         self._setup_robot_and_gui()
 
         # Handle Ctrl+C gracefully
@@ -205,11 +209,31 @@ class UrdfIK:
         self.server.stop()
         sys.exit(0)
 
+    def get_current_joint_positions(self) -> np.ndarray:
+        """Returns the current joint positions as a NumPy array."""
+        return np.array([slider.value for slider in self.slider_handles])
+
+    def get_current_joint_velocities(self) -> np.ndarray:
+        """Returns the estimated joint velocities as a NumPy array."""
+        if self._last_joint_velocities is None:
+            # Not enough data yet
+            return np.zeros(len(self.slider_handles))
+        return self._last_joint_velocities
+
     def run(self) -> None:
         """
         Runs the main loop for the IK application.
         """
         while True:
+            now = time.time()
+            current_positions = self.get_current_joint_positions()
+            if self._last_joint_positions is not None and self._last_time is not None:
+                dt = now - self._last_time
+                if dt > 0:
+                    velocities = (current_positions - self._last_joint_positions) / dt
+                    self._last_joint_velocities = velocities
+            self._last_joint_positions = current_positions
+            self._last_time = now
             if self.ik_mode_checkbox.value:
                 try:
                     ik_solution = pks.solve_ik(
@@ -227,6 +251,8 @@ class UrdfIK:
             else: 
                 # If joint position control is enabled, visualization is already updated with slider.on_update
                 pass
+            # print("Current joint positions:", current_positions)
+            # print("Current joint velocities:", self.get_current_joint_velocities())
             time.sleep(0.01)
 
 def main(
