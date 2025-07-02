@@ -12,6 +12,7 @@ import sys
 import signal
 import jaxlie
 import jax.numpy as jnp
+import scipy.spatial.transform
 
 # Define supported robot types
 SUPPORTED_ROBOT_TYPES = Literal[
@@ -219,6 +220,18 @@ class UrdfIK:
             # Not enough data yet
             return np.zeros(len(self.slider_handles))
         return self._last_joint_velocities
+
+    def get_base_pose(self) -> np.ndarray:
+        """Returns the pose [x, y, z, roll, pitch, yaw] of the 'base' link in the world frame."""
+        q = self.get_current_joint_positions()
+        base_idx = self.robot.links.names.index("base")
+        # Get all link transforms as SE3 objects and select for the base link
+        T_links = self.robot.forward_kinematics(cfg=jnp.array(q))
+        T_base = jaxlie.SE3(T_links[base_idx])
+        pos = np.array(T_base.translation())  # (3,)
+        rot_matrix = np.array(T_base.rotation().as_matrix())  # (3,3)
+        rpy = scipy.spatial.transform.Rotation.from_matrix(rot_matrix).as_euler('xyz')
+        return np.concatenate([pos, rpy])
 
     def run(self) -> None:
         """
